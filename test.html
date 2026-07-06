@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Tareas RBAC - Cliente Visual</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1a73e8;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #1a73e8;
+            padding-bottom: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 12px;
+        }
+        
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        .input-group input, .input-group select, .input-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+            outline: none;
+            border-color: #1a73e8;
+        }
+        
+        .input-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        
+        .btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+            margin-right: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: #1a73e8;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #34a853;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #ea4335;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #fbbc04;
+            color: #333;
+        }
+        
+        .btn-info {
+            background: #4285f4;
+            color: white;
+        }
+        
+        .response {
+            background: #f8f9fa;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+        
+        .response.success {
+            border-color: #34a853;
+            background: #e6f4ea;
+        }
+        
+        .response.error {
+            border-color: #ea4335;
+            background: #fce8e6;
+        }
+        
+        .token-display {
+            background: #e8f0fe;
+            padding: 12px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 600px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-admin {
+            background: #ea4335;
+            color: white;
+        }
+        
+        .badge-supervisor {
+            background: #fbbc04;
+            color: #333;
+        }
+        
+        .badge-operador {
+            background: #34a853;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 API Tareas Corporativas - RBAC</h1>
+        
+        <!-- Token almacenado -->
+        <div class="card">
+            <h3>🔑 Token de Autenticación</h3>
+            <div class="input-group">
+                <label>Token JWT</label>
+                <input type="text" id="tokenInput" placeholder="Pega tu token aquí..." style="font-family: 'Courier New', monospace; font-size: 12px;">
+            </div>
+            <div class="input-group">
+                <label>Mi Rol</label>
+                <input type="text" id="rolDisplay" placeholder="Cargando..." disabled style="background: #f0f2f5;">
+            </div>
+            <button class="btn btn-info" onclick="cargarPerfil()">📱 Cargar Perfil</button>
+        </div>
+        
+        <!-- Autenticación -->
+        <div class="row">
+            <div class="card">
+                <h3>📝 Registro</h3>
+                <div class="input-group">
+                    <label>Nombre</label>
+                    <input type="text" id="regNombre" value="Juan Perez" placeholder="Nombre completo">
+                </div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="regEmail" value="juan@empresa.com" placeholder="Email">
+                </div>
+                <div class="input-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="regPassword" value="Juan123!" placeholder="Contraseña">
+                </div>
+                <div class="input-group">
+                    <label>Rol</label>
+                    <select id="regRol">
+                        <option value="Operador">👤 Operador</option>
+                        <option value="Supervisor">👔 Supervisor</option>
+                        <option value="Admin">👑 Admin</option>
+                    </select>
+                </div>
+                <button class="btn btn-success" onclick="registrar()">✅ Registrar</button>
+            </div>
+            
+            <div class="card">
+                <h3>🔐 Login</h3>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" value="juan@empresa.com" placeholder="Email">
+                </div>
+                <div class="input-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="loginPassword" value="Juan123!" placeholder="Contraseña">
+                </div>
+                <button class="btn btn-primary" onclick="login()">🚀 Iniciar Sesión</button>
+            </div>
+        </div>
+        
+        <!-- Tareas -->
+        <div class="card">
+            <h3>📌 Gestión de Tareas</h3>
+            <div class="row">
+                <div>
+                    <div class="input-group">
+                        <label>Título</label>
+                        <input type="text" id="taskTitulo" value="Mi nueva tarea" placeholder="Título de la tarea">
+                    </div>
+                    <div class="input-group">
+                        <label>Descripción</label>
+                        <textarea id="taskDescripcion" placeholder="Descripción de la tarea">Esta es mi tarea creada desde el HTML</textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Estado</label>
+                        <select id="taskEstado">
+                            <option value="pendiente">⏳ Pendiente</option>
+                            <option value="en_progreso">🔄 En Progreso</option>
+                            <option value="completada">✅ Completada</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Prioridad</label>
+                        <select id="taskPrioridad">
+                            <option value="baja">🟢 Baja</option>
+                            <option value="media">🟡 Media</option>
+                            <option value="alta">🔴 Alta</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" onclick="crearTarea()">➕ Crear Tarea</button>
+                    <button class="btn btn-primary" onclick="listarTareas()">📋 Listar Tareas</button>
+                </div>
+                <div>
+                    <div class="input-group">
+                        <label>ID de Tarea (para ver/actualizar/eliminar)</label>
+                        <input type="text" id="taskId" placeholder="ID de la tarea...">
+                    </div>
+                    <button class="btn btn-info" onclick="obtenerTarea()">🔍 Ver Tarea</button>
+                    <button class="btn btn-warning" onclick="actualizarTarea()">✏️ Actualizar Tarea</button>
+                    <button class="btn btn-danger" onclick="eliminarTarea()">🗑️ Eliminar Tarea</button>
+                    <button class="btn btn-primary" onclick="verEstadisticas()">📊 Estadísticas</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Response -->
+        <div class="card">
+            <h3>📤 Respuesta</h3>
+            <div id="response" class="response">Esperando acción...</div>
+        </div>
+    </div>
+
+    <script>
+        // Guardar token globalmente
+        let token = '';
+        
+        // Funciones de autenticación
+        async function registrar() {
+            const nombre = document.getElementById('regNombre').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const rol = document.getElementById('regRol').value;
+            
+            const response = await fetch('http://localhost:5100/api/auth/registrar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre, email, password, rol })
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+            
+            if (data.success) {
+                token = data.data.token;
+                document.getElementById('tokenInput').value = token;
+                alert('✅ Usuario registrado exitosamente');
+            }
+        }
+        
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const response = await fetch('http://localhost:5100/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+            
+            if (data.success) {
+                token = data.data.token;
+                document.getElementById('tokenInput').value = token;
+                document.getElementById('rolDisplay').value = data.data.user.rol;
+                alert('✅ Login exitoso');
+                cargarPerfil();
+            }
+        }
+        
+        async function cargarPerfil() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            
+            const response = await fetch('http://localhost:5100/api/auth/perfil', {
+                method: 'GET',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                }
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+            
+            if (data.success) {
+                document.getElementById('rolDisplay').value = data.data.rol;
+            }
+        }
+        
+        // Funciones de tareas
+        async function crearTarea() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            
+            const titulo = document.getElementById('taskTitulo').value;
+            const descripcion = document.getElementById('taskDescripcion').value;
+            const estado = document.getElementById('taskEstado').value;
+            const prioridad = document.getElementById('taskPrioridad').value;
+            
+            const response = await fetch('http://localhost:5100/api/tareas', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                },
+                body: JSON.stringify({ titulo, descripcion, estado, prioridad })
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+            
+            if (data.success) {
+                document.getElementById('taskId').value = data.data._id;
+                alert('✅ Tarea creada exitosamente');
+            }
+        }
+        
+        async function listarTareas() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            
+            const response = await fetch('http://localhost:5100/api/tareas', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                }
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+        }
+        
+        async function obtenerTarea() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            const id = document.getElementById('taskId').value;
+            
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            if (!id) {
+                alert('❌ Ingresa el ID de la tarea');
+                return;
+            }
+            
+            const response = await fetch(`http://localhost:5100/api/tareas/${id}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                }
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+        }
+        
+        async function actualizarTarea() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            const id = document.getElementById('taskId').value;
+            
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            if (!id) {
+                alert('❌ Ingresa el ID de la tarea');
+                return;
+            }
+            
+            const titulo = prompt('Nuevo título:', document.getElementById('taskTitulo').value);
+            const estado = prompt('Nuevo estado (pendiente/en_progreso/completada):', 'completada');
+            
+            if (!titulo && !estado) return;
+            
+            const body = {};
+            if (titulo) body.titulo = titulo;
+            if (estado) body.estado = estado;
+            
+            const response = await fetch(`http://localhost:5100/api/tareas/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                },
+                body: JSON.stringify(body)
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+            
+            if (data.success) {
+                alert('✅ Tarea actualizada');
+            }
+        }
+        
+        async function eliminarTarea() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            const id = document.getElementById('taskId').value;
+            
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            if (!id) {
+                alert('❌ Ingresa el ID de la tarea');
+                return;
+            }
+            
+            if (!confirm('¿Seguro que quieres eliminar esta tarea?')) return;
+            
+            const response = await fetch(`http://localhost:5100/api/tareas/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                }
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+            
+            if (data.success) {
+                alert('✅ Tarea eliminada');
+                document.getElementById('taskId').value = '';
+            }
+        }
+        
+        async function verEstadisticas() {
+            const tokenActual = document.getElementById('tokenInput').value;
+            
+            if (!tokenActual) {
+                alert('❌ Primero inicia sesión');
+                return;
+            }
+            
+            const response = await fetch('http://localhost:5100/api/tareas/estadisticas', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tokenActual}`
+                }
+            });
+            
+            const data = await response.json();
+            mostrarRespuesta(data, response.ok);
+        }
+        
+        // Mostrar respuesta
+        function mostrarRespuesta(data, success) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.textContent = JSON.stringify(data, null, 2);
+            responseDiv.className = 'response ' + (success ? 'success' : 'error');
+        }
+    </script>
+</body>
+</html> 
