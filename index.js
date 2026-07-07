@@ -1,73 +1,142 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const helmet = require('helmet');
+
+// Cargar variables de entorno
 dotenv.config();
+
+// Importar rutas
+const authRoutes = require('./routes/authRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const userRoutes = require('./routes/userRoutes');
+
+// Importar middleware de errores
+const errorHandler = require('./middleware/errorHandler');
+
+// Importar modelos y constantes
+const { User, ROLES } = require('./models/user');
 
 const app = express();
 const PORT = process.env.PORT || 5100;
 
-// Middleware
+// Middlewares
+app.use(helmet());
 app.use(express.json());
 
-// Ruta principal
-app.get('/', (req, res) => {
-    res.send('Hello World! - RBAC API');
-});
+// Rutas
+app.use('/api/auth', authRoutes);
+app.use('/api/tareas', taskRoutes);
+app.use('/api/usuarios', userRoutes);
 
-// Health check
+// Ruta de health check
 app.get('/health', (req, res) => {
-    const dbState = mongoose.connection.readyState;
-    const states = {
-        0: 'disconnected',
-        1: 'connected',
-        2: 'connecting',
-        3: 'disconnecting'
-    };
     res.json({
         status: 'OK',
-        server: 'running',
-        port: PORT,
-        mongo: states[dbState] || 'unknown',
-        mongoHost: mongoose.connection.host || 'not connected'
+        timestamp: new Date().toISOString(),
+        mongo: mongoose.connection.readyState === 1 ? '✅ connected' : '❌ disconnected'
     });
 });
 
-console.log('🔍 ===== CONFIGURACIÓN =====');
-console.log(`📌 Puerto: ${PORT}`);
-console.log(`📌 MONGO_URI: ${process.env.MONGO_URI ? '✅ Definida' : '❌ No definida'}`);
-console.log(`📌 JWT_SECRET: ${process.env.JWT_SECRET ? '✅ Definida' : '❌ No definida'}`);
+// Ruta raíz
+app.get('/', (req, res) => {
+    res.send('🚀 API RBAC de Tareas Corporativas');
+});
+
+// Middleware de errores (debe ir al final)
+app.use(errorHandler);
 
 // ============================================
 // CONEXIÓN A MONGODB
 // ============================================
-console.log('\n🔄 Conectando a MongoDB Atlas...');
+async function connectToMongo() {
+    try {
+        const mongoURI = process.env.MONGO_URI;
+        
+        if (!mongoURI) {
+            console.error('❌ MONGO_URI no definida en .env');
+            process.exit(1);
+        }
 
-mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-})
-.then(() => {
-    console.log('✅ ===== CONEXIÓN EXITOSA =====');
-    console.log(`📊 Base de datos: ${mongoose.connection.db.databaseName}`);
-    console.log(`📊 Host: ${mongoose.connection.host}`);
-    console.log(`📊 Puerto: ${mongoose.connection.port}`);
-    console.log(`📊 Estado: Conectado (${mongoose.connection.readyState})`);
-})
-.catch(err => {
-    console.error('❌ ===== ERROR DE CONEXIÓN =====');
-    console.error(`📌 Mensaje: ${err.message}`);
-    console.log('\n💡 Verifica:');
-    console.log('1. Tu IP está en la lista blanca de Atlas');
-    console.log('2. El usuario y contraseña son correctos');
-    console.log('3. La URI es correcta');
-});
+        console.log('🔄 Conectando a MongoDB Atlas...');
+        
+        await mongoose.connect(mongoURI, {
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+        });
+        
+        console.log('✅ Conectado a MongoDB Atlas');
+        console.log(`📊 Base de datos: ${mongoose.connection.db.databaseName}`);
+        
+    } catch (error) {
+        console.error('❌ Error de conexión:', error.message);
+        
+        if (error.message.includes('ENOTFOUND')) {
+            console.log('\n💡 Verifica:');
+            console.log('1. Tu conexión a internet');
+            console.log('2. URI de MongoDB correcta en .env');
+            console.log('3. Tu IP en Network Access de Atlas');
+        } else if (error.message.includes('Authentication failed')) {
+            console.log('\n💡 Verifica:');
+            console.log('1. Usuario y contraseña correctos');
+            console.log('2. El usuario existe en MongoDB Atlas');
+        }
+        
+        process.exit(1);
+    }
+}
+
+// ============================================
+// CREAR ADMIN POR DEFECTO
+// ============================================
+async function crearAdminPorDefecto() {
+    try {
+        const adminEmail = process.env.ADMIN_EMAIL || 'admin@empresa.com';
+        const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+        
+        const adminExistente = await User.findOne({ email: adminEmail });
+        
+        if (!adminExistente) {
+            console.log('🔧 Creando usuario Admin por defecto...');
+            
+            const admin = new User({
+                nombre: 'Administrador',
+                email: adminEmail,
+                password: adminPassword,
+                rol: ROLES.ADMIN,
+                activo: true
+            });
+            
+            await admin.save();
+            console.log('✅ Admin creado exitosamente');
+            console.log(`   📧 Email: ${adminEmail}`);
+            console.log(`   🔑 Password: ${adminPassword}`);
+            console.log('   ⚠️  Cambia estas credenciales en producción');
+        } else {
+            console.log('✅ Admin ya existe');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error creando Admin:', error.message);
+    }
+}
 
 // ============================================
 // INICIAR SERVIDOR
 // ============================================
-app.listen(PORT, () => {
-    console.log(`\n🚀 ===== SERVIDOR ACTIVO =====`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`📋 Health Check: http://localhost:${PORT}/health`);
-    console.log('===============================\n');
+app.listen(PORT, async () => {
+    console.log(`\n🚀 Servidor RBAC corriendo en el puerto ${PORT}`);
+    console.log(`📡 http://localhost:${PORT}`);
+    console.log(`🔗 Health Check: http://localhost:${PORT}/health\n`);
+    
+    await connectToMongo();
+    await crearAdminPorDefecto();
+    
+    console.log('\n✅ Sistema listo para usar');
+    console.log('📋 Endpoints disponibles:');
+    console.log('   POST   /api/auth/registrar  - Registrar usuario');
+    console.log('   POST   /api/auth/login      - Iniciar sesión');
+    console.log('   GET    /api/auth/perfil     - Obtener perfil');
+    console.log('   CRUD   /api/tareas          - Gestionar tareas');
+    console.log('   CRUD   /api/usuarios        - Gestionar usuarios (Admin)\n');
 }); 
