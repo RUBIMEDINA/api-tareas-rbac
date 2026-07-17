@@ -14,22 +14,60 @@ const userRoutes = require('./routes/userRoutes');
 // Importar middleware de errores
 const errorHandler = require('./middleware/errorHandler');
 
+// Importar middleware de token de aplicación
+const validarAppToken = require('./middleware/appTokenValidator');
+
 // Importar modelos y constantes
 const { User, ROLES } = require('./models/user');
+
+// Importar generador de token para mostrar
+const { generarAppToken } = require('./utils/appToken');
 
 const app = express();
 const PORT = process.env.PORT || 5100;
 
-// Middlewares
+// ============================================
+// MIDDLEWARE DE TOKEN DE APLICACIÓN
+// (Se aplica a TODAS las rutas EXCEPTO las públicas)
+// ============================================
+
+// Definir rutas públicas que NO requieren app-token
+const RUTAS_PUBLICAS = ['/health', '/api/app-token'];
+
+// Middleware que excluye rutas públicas
+app.use((req, res, next) => {
+    // Si la ruta está en la lista de públicas, saltar validación
+    if (RUTAS_PUBLICAS.includes(req.path)) {
+        return next();
+    }
+    // Si no, validar app-token
+    validarAppToken(req, res, next);
+});
+
+// Middlewares generales
 app.use(helmet());
 app.use(express.json());
 
-// Rutas
+// ============================================
+// RUTA PÚBLICA PARA OBTENER EL TOKEN DE APLICACIÓN
+// ============================================
+app.get('/api/app-token', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Token de aplicación generado',
+        data: {
+            token: generarAppToken(),
+            usage: 'Usa este token en el header "app-token" para todas las peticiones'
+        }
+    });
+});
+
+// Rutas protegidas (requieren app-token)
 app.use('/api/auth', authRoutes);
 app.use('/api/tareas', taskRoutes);
 app.use('/api/usuarios', userRoutes);
 
-// Ruta de health check
+// Ruta de health check (pública, sin token)
 app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
@@ -134,9 +172,13 @@ app.listen(PORT, async () => {
     
     console.log('\n✅ Sistema listo para usar');
     console.log('📋 Endpoints disponibles:');
-    console.log('   POST   /api/auth/registrar  - Registrar usuario');
-    console.log('   POST   /api/auth/login      - Iniciar sesión');
-    console.log('   GET    /api/auth/perfil     - Obtener perfil');
-    console.log('   CRUD   /api/tareas          - Gestionar tareas');
-    console.log('   CRUD   /api/usuarios        - Gestionar usuarios (Admin)\n');
+    console.log('   📌 RUTAS PÚBLICAS (sin app-token):');
+    console.log('   GET    /health                  - Health Check');
+    console.log('   GET    /api/app-token           - Obtener token de aplicación');
+    console.log('   📌 RUTAS PROTEGIDAS (requieren app-token):');
+    console.log('   POST   /api/auth/registrar     - Registrar usuario');
+    console.log('   POST   /api/auth/login         - Iniciar sesión');
+    console.log('   GET    /api/auth/perfil        - Obtener perfil');
+    console.log('   CRUD   /api/tareas             - Gestionar tareas');
+    console.log('   CRUD   /api/usuarios           - Gestionar usuarios (Admin)\n');
 }); 
